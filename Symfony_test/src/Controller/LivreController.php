@@ -1,7 +1,7 @@
 <?php
 
 // src/Controller/ProductController.php
-namespace Controller;
+namespace App\Controller;
 
 // ...
 use App\Entity\Livre;
