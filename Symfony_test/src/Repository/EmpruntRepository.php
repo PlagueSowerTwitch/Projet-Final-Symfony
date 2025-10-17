@@ -29,6 +29,30 @@ class EmpruntRepository extends ServiceEntityRepository
         ->getResult();
 }
 
+    /**
+     * Retourne les emprunts dont le livre appartient à un auteur donné entre deux dates.
+     *
+     * @param \DateTime $debut
+     * @param \DateTime $fin
+     * @param int $auteurId
+     * @return Emprunt[]
+     */
+    public function findEmpruntsBetweenDatesByAuthor(\DateTime $debut, \DateTime $fin, int $auteurId): array
+    {
+        return $this->createQueryBuilder('e')
+            ->join('e.idLivre', 'l')
+            ->join('l.idAuteur', 'a')
+            ->join('e.idUtilisateur', 'u')
+            ->where('e.DateEmprunt BETWEEN :debut AND :fin')
+            ->andWhere('a.id = :auteurId')
+            ->setParameter('debut', $debut)
+            ->setParameter('fin', $fin)
+            ->setParameter('auteurId', $auteurId)
+            ->orderBy('e.DateEmprunt', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
 
     //    /**
     //     * @return Emprunt[] Returns an array of Emprunt objects

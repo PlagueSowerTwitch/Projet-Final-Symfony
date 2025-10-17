@@ -1,15 +1,9 @@
 <?php
 
-// src/Controller/ProductController.php
 namespace App\Controller;
 
-// ...
 use App\Entity\Livre;
-use App\Entity\Categorie;
-use App\Entity\Auteur;
-use App\Entity\Utilisateur;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -19,80 +13,83 @@ use Symfony\Component\HttpFoundation\Request;
 class LivreController extends AbstractController
 {
     #[Route('/create', name: 'create_Livre', methods: ['POST'])]
-    public function createLivre(
-        Request $request,
-        EntityManagerInterface $entityManager
-    ): Response
+    public function createLivre(Request $request, EntityManagerInterface $entityManager): JsonResponse
     {
         $content = json_decode($request->getContent(), true);
 
-        $Livre = new Livre();
-        $Livre->setTitre($content['title']);
-        $Livre->setDatePublication(new \Datetime());
-        $Livre->setDisponible($content['available']);
+        if (!$content || !isset($content['title']) || !isset($content['datePublication']) || !isset($content['available'])) {
+            return new JsonResponse(['error' => 'Champs manquants (title, datePublication ,available)'], 400);
+        }
 
-        // tell Doctrine you want to (eventually) save the Livre (no queries yet)
-        $entityManager->persist($Livre);
+        $livre = new Livre();
+        $livre->setTitre($content['title']);
+        $livre->setDatePublication(new \DateTime($content['datePublication']));
+        $livre->setDisponible($content['available']);
 
-        // actually executes the queries (i.e. the INSERT query)
+        $entityManager->persist($livre);
         $entityManager->flush();
 
-        return new Response('Saved new Livre with id '.$Livre->getId());
+        return new JsonResponse([
+            'message' => 'Livre créé avec succès',
+            'id' => $livre->getId(),
+            'titre' => $livre->getTitre(),
+            'disponible' => $livre->isDisponible(),
+        ], 201);
     }
 
     #[Route('/{id}/edit', name: 'edit_Livre', methods: ['PATCH', 'PUT'])]
-    public function editLivre(
-        Request $request,
-        EntityManagerInterface $entityManager,
-        int $id
-    ): Response
+    public function editLivre(Request $request, EntityManagerInterface $entityManager, int $id): JsonResponse
     {
         $content = json_decode($request->getContent(), true);
-        $Livre = $entityManager->getRepository(Livre::class)->find($id);
-        if (isset($content['title'])) {
-            $Livre->setTitre($content['title']);
+        $livre = $entityManager->getRepository(Livre::class)->find($id);
+
+        if (!$livre) {
+            return new JsonResponse(['error' => 'Livre non trouvé'], 404);
         }
-        $Livre->setDatePublication(new \Datetime());
-        $Livre->setDisponible($content['available']);
 
-        // tell Doctrine you want to (eventually) save the Livre (no queries yet)
-        $entityManager->persist($Livre);
+        if (isset($content['title'])) {
+            $livre->setTitre($content['title']);
+        }
+        if (isset($content['available'])) {
+            $livre->setDisponible($content['available']);
+        }
+        if (isset($content['datePublication'])) {
+            $livre->setDatePublication(new \DateTime($content['datePublication']));
+        }
 
-        // actually executes the queries (i.e. the INSERT query)
         $entityManager->flush();
 
-        return new Response('Updated Livre with id '.$Livre->getId());
+        return new JsonResponse(['message' => 'Livre mis à jour', 'id' => $livre->getId()]);
     }
 
     #[Route('/{id}/delete', name: 'delete_Livre', methods : ['DELETE'])]
-    public function deleteLivre(
-        EntityManagerInterface $entityManager,
-        int $id
-    ): Response
+    public function deleteLivre(EntityManagerInterface $entityManager, int $id): JsonResponse
     {
-        $Livre = $entityManager->getRepository(Livre::class)->find($id);
-        if (!$Livre) {
-            return new Response('Livre not found', Response::HTTP_NOT_FOUND);
+        $livre = $entityManager->getRepository(Livre::class)->find($id);
+        if (!$livre) {
+            return new JsonResponse(['error' => 'Livre non trouvé'], 404);
         }
 
-        $entityManager->remove($Livre);
+        $entityManager->remove($livre);
         $entityManager->flush();
 
-        return new Response('Deleted Livre with id '.$id);
+        return new JsonResponse(['message' => 'Livre supprimé', 'id' => $id]);
     }
 
-    #[Route('/{id}/get', name: 'avalaible_Livre', methods: ['GET'])]
-    public function getLivre(
-        EntityManagerInterface $entityManager,
-        int $id
-    ): Response
+    #[Route('/{id}/get', name: 'get_Livre', methods: ['GET'])]
+    public function getLivre(EntityManagerInterface $entityManager, int $id): JsonResponse
     {
-        $Livre = $entityManager->getRepository(Livre::class)->find($id);
-        if (!$Livre->isDisponible()) {
-            return new Response('Livre not found', Response::HTTP_NOT_FOUND);
+        $livre = $entityManager->getRepository(Livre::class)->find($id);
+
+        if (!$livre) {
+            return new JsonResponse(['error' => 'Livre non trouvé'], 404);
         }
 
-        return new JsonResponse($Livre);
+        return new JsonResponse([
+            'id' => $livre->getId(),
+            'titre' => $livre->getTitre(),
+            'datePublication' => $livre->getDatePublication()->format('Y-m-d'),
+            'disponible' => $livre->isDisponible(),
+        ]);
     }
-
 }

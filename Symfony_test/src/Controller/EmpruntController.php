@@ -6,6 +6,7 @@ use App\Entity\Emprunt;
 use App\Repository\EmpruntRepository;
 use App\Repository\LivreRepository;
 use App\Repository\UtilisateurRepository;
+use App\Repository\AuteurRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -111,24 +112,33 @@ class EmpruntController extends AbstractController
         ]);
     }
 
-    #[Route('/periode', name: 'entre_dates', methods: ['GET'])]
+    #[Route('/periode/{auteurId}/{debut}/{fin}', name: 'entre_dates', methods: ['GET'])]
     public function empruntsEntreDates(
-        Request $request,
-        EmpruntRepository $empruntRepo
+        int $auteurId,
+        string $debut,
+        string $fin,
+        EmpruntRepository $empruntRepo,
+        AuteurRepository $auteurRepo
     ): JsonResponse {
-        $debut = $request->query->get('debut');
-        $fin = $request->query->get('fin');
-
-        if (!$debut || !$fin) {
-            return new JsonResponse(['error' => 'Paramètres "debut" et "fin" requis'], 400);
+        // Vérifier que l'auteur existe
+        $auteur = $auteurRepo->find($auteurId);
+        if (!$auteur) {
+            return new JsonResponse(['error' => 'Auteur introuvable'], 404);
+        }
+        try {
+            $dateDebut = new \DateTime($debut);
+            $dateFin = new \DateTime($fin);
+        } catch (\Exception $e) {
+            return new JsonResponse(['error' => 'Format de date invalide. Utilisez YYYY-MM-DD'], 400);
         }
 
-        $dateDebut = new \DateTime($debut);
-        $dateFin = new \DateTime($fin);
+        if ($dateDebut > $dateFin) {
+            return new JsonResponse(['error' => 'La date de début doit être inférieure ou égale à la date de fin'], 400);
+        }
 
-        $emprunts = $empruntRepo->findEmpruntsBetweenDates($dateDebut, $dateFin);
+    $emprunts = $empruntRepo->findEmpruntsBetweenDatesByAuthor($dateDebut, $dateFin, $auteurId);
 
-        $data = array_map(function ($e) {
+        $data = array_map(function (Emprunt $e) {
             return [
                 'livre' => $e->getIdLivre()->getTitre(),
                 'dateEmprunt' => $e->getDateEmprunt()->format('Y-m-d'),
@@ -137,6 +147,7 @@ class EmpruntController extends AbstractController
         }, $emprunts);
 
         return new JsonResponse([
+            'auteur' => $auteur->getPrenom() . ' ' . $auteur->getNom(),
             'periode' => [
                 'debut' => $dateDebut->format('Y-m-d'),
                 'fin' => $dateFin->format('Y-m-d'),
